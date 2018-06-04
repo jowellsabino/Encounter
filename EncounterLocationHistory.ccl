@@ -1,0 +1,34 @@
+select Patient=p.name_full_formatted
+     , MRN=pa.alias
+     , CSN=ea.alias
+     , eh.updt_dt_tm
+	 ,  NurseUnit=uar_get_code_display(eh.loc_nurse_unit_cd)
+     ,  Room=uar_get_code_display(eh.location_cd)
+     ,  EncounterTypeClass=uar_get_code_display(eh.encntr_type_class_cd)
+     ,  EncounterType=uar_get_code_display(eh.encntr_type_cd)
+     ,  Last_Status=uar_get_code_display(e.encntr_status_cd)
+     ,  UpdatedBy=pr.name_full_formatted
+     ,  eh.depart_dt_tm
+     ,  eh.*
+from encntr_loc_hist eh
+  , (inner join prsnl pr on pr.person_id = eh.updt_id)
+  , (inner join encounter e on e.encntr_id = eh.encntr_id)
+  ,(inner join encntr_alias ea on ea.encntr_id = e.encntr_id
+          and ea.active_ind = 1)
+  ,(inner join code_value cveat on cveat.code_value = ea.encntr_alias_type_cd
+          and cveat.cdf_meaning = 'FIN NBR' ;; 1077
+          and cveat.code_set = 319
+          and cveat.active_ind = 1)
+  ,(inner join person p on p.person_id = e.person_id
+          and p.active_ind = 1
+          and p.end_effective_dt_tm > sysdate)
+  ,(inner join person_alias pa on pa.person_id = e.person_id
+          and pa.end_effective_dt_tm > sysdate
+          and pa.active_ind = 1)
+  ,(inner join code_value cvpa on cvpa.code_value = pa.alias_pool_cd
+          and cvpa.display = 'CHB_MRN' ;; 3110551
+          and cvpa.active_ind = 1)
+where eh.encntr_id in (77933115) ;; encounter_id of CSN of interest
+order by eh.encntr_id, eh.updt_dt_tm
+WITH format(date,";;q")
+go
