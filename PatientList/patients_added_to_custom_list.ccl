@@ -1,0 +1,76 @@
+/* --- Custom list patients ----
+;;
+;; ONLY CUSTOM and CARETEAM patient lists can be manually added to.
+;;
+;;Cannot manually add patients to: LOCATION, MEDICAL SERVICE, RELATIONSHIP, PROVIDER GROUPS, QUERY
+;;
+;; To do - add filters to show how the patient list will appear in powerchart.  Also, need to eliminate dupe rows
+;; due to patients added multiple times
+;;
+;; A customlist can have additional parameters.  For example you can put a location parameter to the custom list.
+;; Note however, that additional parametrs are AND-ed.  So,
+;; 1)  Adding a location will NOT automatically pull patients in that location to the custom list. 
+;;     Like all custom patient lists, the patient must be manually added
+;; 2) Since the additinal parameter is AND-ed, if you add a patient from another location to that custom list,
+;;    the patient will be added to the custom list but will NOT be dispplayed in the front-end!!!!
+;;   
+*/
+select Patient_List=pl.name
+      , Patient_List_Type=cvpl.display
+      , Patient=p.name_full_formatted
+      , MRN=pa.alias
+  ;    , Patient_ID=pl_pt.person_id
+      , CSN=ea.alias
+  ;    , pl_pt.encntr_id
+      , Updated_By=pr.name_full_formatted
+  ;    , pl_pt.updt_id
+      , pl_pt.updt_dt_tm ;; if addedmore than once, will be duped.
+;      , pl_args.argument_name
+;      , pl_args.argument_value
+;      , pl_args.parent_entity_name
+;      , pl_args.parent_entity_id
+  ;    , e.loc_nurse_unit_cd
+      , Location= cvloc.display
+ ;;     , pl_pt.*
+from  dcp_patient_list pl
+   , (inner join code_value cvpl
+              on cvpl.code_value = pl.patient_list_type_cd
+             and cvpl.code_set = 27360)
+   , (inner join dcp_pl_argument pl_args
+              on pl_args.patient_list_id = pl.patient_list_id)
+             ; and pl_args.parent_entity_name = 'PRSNL'
+             ; and pl_args.argument_name = 'prsnl_id')
+   , (inner join dcp_pl_custom_entry pl_pt
+              on pl_pt.patient_list_id = pl.patient_list_id
+             and pl_pt.patient_list_id > 0)
+   , (inner join person p
+              on p.person_id = pl_pt.person_id)
+   , (inner join person_alias pa
+              on pa.person_id = p.person_id
+             and pa.alias_pool_cd = 3110551.00
+             and pa.active_ind = 1
+             and pa.end_effective_dt_tm > sysdate)
+    , (inner join code_value cvpa
+               on cvpa.code_value = pa.person_alias_type_cd
+              and cvpa.cdf_meaning = 'MRN')
+    , (inner join encounter e
+               on e.encntr_id = pl_pt.encntr_id)
+    , (inner join code_value cvloc
+               on cvloc.code_value = e.loc_nurse_unit_cd
+              and cvloc.code_set = 220)
+    , (inner join encntr_alias ea on ea.encntr_id = e.encntr_id
+              and ea.active_ind = 1
+              and ea.end_effective_dt_tm > sysdate)
+    , (inner join code_value cveat on cveat.code_value = ea.encntr_alias_type_cd
+              and cveat.cdf_meaning = 'FIN NBR' ;; 1077
+              and cveat.code_set = 319
+              and cveat.active_ind = 1)
+    , (inner join prsnl pr
+              on pr.person_id = pl_pt.updt_id)
+where pl.owner_prsnl_id =  (<patient list owner person_id>) ;; Patient list owner here
+  and pl.name = 'Retro*' ;; Optional: add custom list name here, else comment out to return everything
+order by Patient_List
+      , Patient_List_Type
+      , Patient
+with maxrec=100,maxtime=100,format(date,";;q")
+go

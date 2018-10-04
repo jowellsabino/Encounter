@@ -1,0 +1,34 @@
+/* ***
+;; Proxied patient lists that are also visible to user, granted by somebody else
+** */
+select pl.name, pl.description
+     , pl.patient_list_id
+     , patient_list_type=cvpl.display
+     , Access=cvaccess.display                  /*  If you want to do a UNION with above query, remove this */
+     , Access_Description=cvaccess.description  /*  and this */
+     , owner=prown.name_full_formatted
+     , pl.seq
+     , pl_args.argument_name
+     , pl_args.argument_value
+     , pl_args.parent_entity_name
+     , pl_args.parent_entity_id
+     , Updated_By=prupd.name_full_formatted
+     , pl_args.updt_dt_tm
+from   dcp_pl_reltn plr
+    , (inner join code_value cvaccess
+               on cvaccess.code_value = plr.list_access_cd
+              and cvaccess.code_set = 27380)
+    , (inner join dcp_patient_list pl
+               on pl.patient_list_id = plr.patient_list_id)
+    , (inner join dcp_pl_argument pl_args
+               on pl.patient_list_id = pl_args.patient_list_id)
+    , (inner join code_value cvpl
+               on cvpl.code_value = pl.patient_list_type_cd
+              and cvpl.code_set = 27360)
+     , (inner join prsnl prown
+              on prown.person_id = pl.owner_prsnl_id)
+     , (inner join prsnl prupd
+              on prupd.person_id = pl.owner_prsnl_id)
+              ; 27830
+where plr.prsnl_id in (<person_id of proxee>) ;; PUT PROXIED TO (not the owner) person_id here
+WITH maxrec=1000,maxtime=300,format(date,";;q")
